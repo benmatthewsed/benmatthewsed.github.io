@@ -1,5 +1,5 @@
 ---
-title: "quarto-blog"
+title: "Ben Matthews blog"
 listing:
   contents: posts
   sort: "date desc"
