@@ -7,18 +7,14 @@ about:
   image-shape: round
   image-width: 20em
   links:
-    - text: Twitter
+    - icon: Twitter
       href: https://twitter.com/benmatthewsed
-    - text: GitHub
+    - icon: GitHub
       href: https://github.com/benmatthewsed
-    - text: Email
+    - icon: Email
       href: mailto:benmatthewsed@gmail.com
+    - icon: google
+      href: https://scholar.google.co.uk/citations?user=2yaVvCQAAAAJ&hl=en
 ---
 
-This is a Quarto website.
-
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
-
-```{r}
-1 + 1
-```
+Ben is a Lecturer in Social Statistics and Demography at the [University of Stirling](https://www.stir.ac.uk/people/1752324).
