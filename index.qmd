@@ -1,5 +1,18 @@
 ---
-title: "tmp"
+title: "Ben Matthews"
+image: headshot.jpg
+toc: false
+about: 
+  template: trestles
+  image-shape: round
+  image-width: 20em
+  links:
+    - text: Twitter
+      href: https://twitter.com/benmatthewsed
+    - text: GitHub
+      href: https://github.com/benmatthewsed
+    - text: Email
+      href: mailto:benmatthewsed@gmail.com
 ---
 
 This is a Quarto website.
