@@ -3,18 +3,18 @@ project:
   output-dir: docs
 
 website:
-  title: "Ben Matthews blog"
+  title: "tmp"
   navbar:
-    right:
+    left:
+      - href: index.qmd
+        text: Home
       - about.qmd
-      - icon: github
-        href: https://github.com/benmatthewsed
-      - icon: twitter
-        href: https://twitter.com/benmatthewsed
+
 format:
   html:
     theme: cosmo
     css: styles.css
+    toc: true
 
-
+editor: visual
 
