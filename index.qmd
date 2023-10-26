@@ -7,11 +7,11 @@ about:
   image-shape: round
   image-width: 20em
   links:
-    - icon: Twitter
+    - icon: twitter
       href: https://twitter.com/benmatthewsed
-    - icon: GitHub
+    - icon: github
       href: https://github.com/benmatthewsed
-    - icon: Email
+    - icon: envelope
       href: mailto:benmatthewsed@gmail.com
     - icon: google
       href: https://scholar.google.co.uk/citations?user=2yaVvCQAAAAJ&hl=en
