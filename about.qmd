@@ -1,5 +1,0 @@
----
-title: "About"
----
-
-Ben is a Lecturer in Social Statistics and Demography at the University of Stirling.
