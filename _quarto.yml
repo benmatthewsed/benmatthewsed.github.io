@@ -16,6 +16,9 @@ website:
         href: presentations/index.qmd
       - text: "Posts"
         href: posts/index.qmd
+      - text: "Training"
+        href: training/index.qmd
+        
 
 format:
   html:
