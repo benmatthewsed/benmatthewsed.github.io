@@ -11,6 +11,27 @@
     "href": "about.html",
     "title": "About",
     "section": "",
-    "text": "About this site\n\n1 + 1\n\n[1] 2"
+    "text": "Ben is a Lecturer in Social Statistics and Demography at the University of Stirling."
+  },
+  {
+    "objectID": "presentations/index.html",
+    "href": "presentations/index.html",
+    "title": "Presentations",
+    "section": "",
+    "text": "Put links to some presentations here.\n\nThe Age-crime curve in (some of) Northern Europe\nUnderstanding the relationships between risk factors, intersectional identities and criminal career trajectories: A multilevel approach"
+  },
+  {
+    "objectID": "posts/index.html",
+    "href": "posts/index.html",
+    "title": "Posts",
+    "section": "",
+    "text": "Put links to some posts here."
+  },
+  {
+    "objectID": "training/index.html",
+    "href": "training/index.html",
+    "title": "Training",
+    "section": "",
+    "text": "Put links to some training courses here.\n\nIntroduction to data visualisation with ggplot2"
   }
 ]

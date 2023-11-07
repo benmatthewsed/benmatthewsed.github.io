@@ -5,14 +5,21 @@ project:
 website:
   title: "Ben Matthews"
   navbar:
+  
+      # my sub-pages
     left:
-      - href: index.qmd
-        text: Home
-      - about.qmd
+      - text: "Home"
+        href: index.qmd
+      - text: "About"
+        href: about.qmd
+      - text: "Presentations"
+        href: presentations/index.qmd
+      - text: "Posts"
+        href: posts/index.qmd
 
 format:
   html:
-    theme: cosmo
+    theme: flatly
     css: styles.css
     toc: true
 

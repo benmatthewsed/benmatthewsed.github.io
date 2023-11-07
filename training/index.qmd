@@ -1,0 +1,7 @@
+---
+title: "Training"
+---
+
+Put links to some training courses here.
+
+-   [Introduction to data visualisation with `ggplot2`](https://benmatthewsed.github.io/ui-data-visualization-course/#1)
