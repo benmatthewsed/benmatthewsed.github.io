@@ -5,3 +5,4 @@ title: "Training"
 Put links to some training courses here.
 
 -   [Introduction to data visualisation with `ggplot2`](https://benmatthewsed.github.io/ui-data-visualization-course/#1)
+-   [Statistical Methods for Criminology](https://benmatthewsed.github.io/statistical-methods-criminology-slides) In September 2024 I ran an online workshop for [NCRM](https://www.ncrm.ac.uk/) on [statistical methods for criminology](https://www.ncrm.ac.uk/training/show.php?article=13428). You can see all the slides at the link.
