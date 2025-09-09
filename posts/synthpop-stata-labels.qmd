@@ -1,0 +1,163 @@
+---
+title: "Synthesising data in R with {synthpop} and keeping Stata variable labels"
+description: "Making syn"
+author: "Ben Matthews"
+date: "09/09/2025"
+draft: true
+---
+
+
+ key aspects are:
+ 
+ 1. keep everything in order
+ 2. export original variable labels
+ 3. convert to factor before synthesising, synthesise with 'raw' data
+ 4. swap value labels between original data and synthetic data
+ 5. add variable names to synthetic data from original data
+ 6. add the variable labels from the original data
+ 7. covert type to expose label attribute
+
+
+
+```{r load-packages}
+
+
+library(tidyverse)
+library(haven)
+library(synthpop)
+library(naniar)
+
+
+
+nlsw88 <- read_dta("https://www.stata-press.com/data/r19/nlsw88.dta")
+
+n_val <- nrow(nlsw88) # we'll need this later
+
+```
+
+
+```{r variable-labels}
+
+# export variable labels
+
+variable_labels <- 
+  nlsw88 |> 
+  sjlabelled::get_label()
+
+```
+
+
+
+This part will depend on the dataset you're using - but you will probably want to convert factor variables to factors to avoid impossible results (negative ages; categories that don't exist in the original data, that sort of thing). There is helpful guidance on the [synthpop website](https://www.synthpop.org.uk/get-started.html) about when and when not to do this (mostly - if you have lots of factor levels this might cause you problems). I'm going to do this carte blanche and convert every variable that has been imported as type `labelled` to a factor. You probably want to check this variable by variable.
+
+```{r type-convert}
+
+nlsw88_bare <- 
+  nlsw88 |> 
+  mutate(across(where(is.labelled), sjlabelled::as_factor))
+```
+
+The [synthpop website](https://www.synthpop.org.uk/get-started.html) also advises to check for missing data. In our case this seems to have all been imported into `R` as it's built-in `NA` type. If you are aiming for consistency with the underlying Stata data then you might want to keep data with `-9` or `-999` as factor variables so they are preserved in the synthesis - although this may lead to other problems as described above.
+
+The last thing we need to do is remove the ID variable. It might be possible to do this within the call to `syn` but I've been doing this separately and then making a new ID variable after the synthesis.
+
+
+```{r remove-id}
+
+nlsw88_bare <- 
+  nlsw88_bare |> 
+  select(-idcode)
+
+```
+
+# Synthesis
+
+This approach uses the synthpop defaults - it's not optimized at all. You might want to tune this to your particular application.
+
+I set the seed for reproducibility - if you're doing this year after year you probably want to change the seed for each new dataset.
+
+```{r synthesis}
+
+nlsw88_syn <- syn(nlsw88_bare, seed = nchar("fake data") ^ 4)
+
+```
+
+We have some synthetic data! Before beautifying we can export the synthetic data from the `nlsw88_syn` object and add a new ID variable.
+
+```{r newid}
+
+nlsw88_new <- 
+  nlsw88_syn$syn |> 
+  as_tibble() |> 
+  mutate(idcode = seq(1, n_val)) |> 
+  select(idcode, everything())
+
+```
+
+# Checking 
+
+You'll want to do some checks here for variables you care about,  are the key relationships the same and that sort of thing. Again, the [synthpop website](https://www.synthpop.org.uk/resources.html) has excellent resources for this.
+
+# Beautifying 
+
+The tricky bit now is getting all the right variable labels and things back into the dataset to import into Stata. The value labels are stored in `attributes` in `R` so we need to do a bit of legwork to port them over from the original data
+
+
+## Updating
+
+The function below takes the labels attribute for each variable from the original data and then assigns it to the same variable in the new data, matching by name.
+
+```{r swap-value-labels-fn}
+
+swap_value_labels <- function(syn_dat, original_dat, var){
+  
+  attributes(syn_dat[[var]])$labels <- attributes(original_dat[[var]])$labels
+  
+  return(syn_dat[[var]])
+  
+}
+
+```
+
+We want to apply this function to each of the variables, swapping the labels from the synthesised data with the variable from the original data and save as new dataset. Note that this will produce a new dataset in the order of the variables in the original dataset.
+
+```{r new-variable-labels}
+
+nlsw88_syn2 <- map_dfc(names(nlsw88), ~ swap_value_labels(nlsw88_new, nlsw88, .x))
+
+```
+
+This function has the undesirable effect of giving back a dataset with no names, so we add the names back in. Note that 
+this _will only work if the variables in the original data and the newly synthesised data are in the same order_.
+
+```{r new-names}
+names(nlsw88_syn2) <- names(nlsw88)
+
+```
+
+We can now add the variable labels we saved initially.
+
+```{r apply-new-variable-labels}
+
+nlsw88_syn2 <- 
+  nlsw88_syn2 |> 
+  sjlabelled::set_label(
+    label = variable_labels
+  )
+```
+
+Finally we covert the type of the new data back to `labelled` to show the value labels. This will show the value labels where that variable has a value label attribute. You could also just do this for factor variables not `everything()`
+
+```{r convert-type}
+
+nlsw88_syn2 <- 
+  nlsw88_syn2 |> 
+  mutate(across(everything(),
+                ~ sjlabelled::as_labelled(.x)))
+```
+
+You can export the data with `haven::write_dta()`.
+
+
+
+
