@@ -2,6 +2,9 @@
 title: "Presentations"
 ---
 
+-   [Why is Scotland’s reconviction rate falling?](https://benmatthewsed.github.io/reconviction-rates-scotland/#/title-slide) Results from work with Josiah King and Jamie Buchan analysing change in Scotland's reconviction rate using standardization and decomposition. This separates out the underlying (and substantial) demographic change in the population of people being convicted from change in the reconviction rate _per se_.
+
+
 -   [What do I look for in a survey dataset as a (crime survey) data user?](https://speakerdeck.com/benmatthewsed/what-do-i-look-for-in-a-survey-dataset-as-a-crime-survey-data-user) These slides are from the [Survey Futures Survey Practice Forum #4](https://surveyfutures.net/events/2024/10/02/survey-practice-forum-4/) held on 6 December 2024. The talk covered some of the strengths and challenges of using the [Scottish Crime and Justice Survey](https://www.gov.scot/collections/scottish-crime-and-justice-survey/) to measure changes in victimization over time.
 
 -   [The Tyranny of the Means](https://benmatthewsed.github.io/tyranny-of-means) Regression coefficients focus on mean differences between groups. This is fine. But sometimes we want more...
