@@ -104,6 +104,60 @@
     margin-right:6px;
     vertical-align:middle;
   }
+  .marker-panel{
+    margin-top:20px;
+    padding-top:16px;
+    border-top:1px solid var(--grid);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  .marker-row{
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+  }
+  #logOddsInput{
+    flex:1;
+    min-width:0;
+    padding:7px 9px;
+    border:1px solid #d8d4c9;
+    border-radius:4px;
+    font-size:0.88rem;
+    font-family:inherit;
+    background:#fff;
+    color:var(--ink);
+  }
+  #logOddsInput:focus{
+    outline:none;
+    border-color:var(--accent);
+  }
+  .marker-row button{
+    padding:7px 12px;
+    border-radius:4px;
+    border:1px solid var(--accent);
+    background:var(--accent);
+    color:#fff;
+    font-size:0.85rem;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .marker-row button.ghost{
+    background:transparent;
+    color:var(--muted);
+    border-color:#d8d4c9;
+  }
+  .marker-row button:hover{
+    opacity:0.88;
+  }
+  .marker-note{
+    font-size:0.78rem;
+    color:var(--muted);
+    line-height:1.4;
+    margin-top:8px;
+  }
+  .marker-note.active{
+    color:var(--accent);
+    font-weight:600;
+  }
   footer{
     margin-top:34px;
     padding-top:14px;
@@ -125,8 +179,8 @@
   <h1>How odds ratios translate into probability differences</h1>
   <p class="sub">
     Each curve traces one fixed odds ratio (1&ndash;200) across every possible baseline
-    probability. The same odds ratio produces wildly different absolute risk
-    differences depending on how common the outcome already is. Move your mouse
+    probability. The same odds ratio produces very different absolute risk
+    differences depending on how common the outcome is. You can move your mouse
     over the chart to trace an individual curve.
   </p>
 
@@ -145,9 +199,19 @@
       <div class="hint">
         <span class="swatch" style="background:#0b2545"></span>Low odds ratios sit at the bottom of the fan.<br>
         <span class="swatch" style="background:#7fbfe0"></span>High odds ratios reach the top.<br><br>
-        Hover anywhere on the plot &mdash; the nearest integer odds ratio (1&ndash;200) is
+        Hover anywhere on the plot &mdash; the nearest odds ratio (1&ndash;200) is
         highlighted, and its exact probability difference at that point is read
         out on the y-axis.
+      </div>
+
+      <div class="marker-panel">
+        <div class="label">Mark a baseline on the log-odds scale</div>
+        <div class="marker-row">
+          <input type="number" id="logOddsInput" step="0.01" placeholder="e.g. -1.5">
+          <button id="markBtn">Plot</button>
+          <button id="clearBtn" class="ghost">Clear</button>
+        </div>
+        <div class="marker-note" id="markerNote">Enter a log-odds value (a logistic regression intercept) to drop a line at the matching baseline probability.</div>
       </div>
     </div>
   </div>
@@ -155,7 +219,7 @@
   <footer>
     Odds<sub>2</sub> = OR &times; Odds<sub>1</sub>, where Odds = p / (1&minus;p).
     Comparison-group probability is solved back out as p<sub>2</sub> = Odds<sub>2</sub> / (1 + Odds<sub>2</sub>).
-    Curves plot p<sub>2</sub> &minus; p<sub>1</sub> across p<sub>1</sub> &isin; [0, 1] for integer OR from 1 to 200.
+    Curves plot p<sub>2</sub> &minus; p<sub>1</sub> across p<sub>1</sub> &isin; [0, 1] for OR from 1 to 200.
   </footer>
 </div>
 
@@ -184,6 +248,20 @@
   const MIN_OR = 1, MAX_OR = 200;
   const N_SAMPLES = 240;
 
+  // build the list of odds ratios to plot: finer steps at the low end where
+  // curves are most different from one another, coarser steps higher up.
+  function buildORList(){
+    const list = [];
+    const add = (v) => list.push(Math.round(v*1000)/1000);
+    let v;
+    for(v = 1; v < 2 - 1e-9; v += 0.1) add(v);
+    for(v = 2; v < 3 - 1e-9; v += 0.25) add(v);
+    for(v = 3; v < 5 - 1e-9; v += 0.5) add(v);
+    for(v = 5; v <= 200 + 1e-9; v += 1) add(v);
+    return list;
+  }
+  const ORS = buildORList();
+
   // color scale: dark navy (low OR) -> light blue (high OR)
   function lerp(a,b,t){ return a + (b-a)*t; }
   function colorFor(or){
@@ -210,7 +288,7 @@
   for(let i=0;i<=N_SAMPLES;i++){ xs.push(i/N_SAMPLES); }
 
   const curves = [];
-  for(let or = MIN_OR; or <= MAX_OR; or++){
+  for(const or of ORS){
     const ys = xs.map(p1 => diffForOR(or, p1));
     curves.push({ or, ys });
   }
@@ -267,6 +345,7 @@
   }
 
   let highlightOR = null;
+  let markerP1 = null; // baseline probability from log-odds input, drawn as vertical line
 
   function draw(){
     ctx.clearRect(0,0,cssW,cssH);
@@ -308,13 +387,49 @@
     }
 
     ctx.restore();
+
+    // vertical marker line for the log-odds / intercept lookup
+    if(markerP1 !== null){
+      const px = xToPx(markerP1);
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 1.6;
+      ctx.moveTo(px, margin.top);
+      ctx.lineTo(px, margin.top + plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // small marker dot on baseline (diff = 0 point) and label
+      ctx.fillStyle = '#c2410c';
+      ctx.beginPath();
+      ctx.arc(px, margin.top + plotH, 3.5, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      const label = 'p\u2081 = ' + (markerP1*100).toFixed(1) + '%';
+      const labelY = margin.top + 12;
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(px - tw/2 - 4, labelY - 11, tw + 8, 15);
+      ctx.fillStyle = '#c2410c';
+      ctx.fillText(label, px, labelY);
+      ctx.restore();
+    }
   }
 
   draw();
 
+  function formatOR(or){
+    // show up to 2 decimals, trimming trailing zeros
+    return (Math.round(or*100)/100).toString();
+  }
+
   function updateReadout(or, p1, diff){
     document.getElementById('orValue').innerHTML = or !== null
-      ? or + '<small>x baseline odds</small>' : '&mdash;';
+      ? formatOR(or) + '<small>x baseline odds</small>' : '&mdash;';
     if(or === null){
       document.getElementById('p1Value').textContent = '\u2014';
       document.getElementById('p2Value').textContent = '\u2014';
@@ -363,6 +478,48 @@
     highlightOR = null;
     draw();
     updateReadout(null, 0, 0);
+  });
+
+  // --- log-odds / intercept marker ---
+  const logOddsInput = document.getElementById('logOddsInput');
+  const markBtn = document.getElementById('markBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const markerNote = document.getElementById('markerNote');
+
+  function plogis(x){ return 1 / (1 + Math.exp(-x)); }
+
+  function setMarker(){
+    const raw = logOddsInput.value.trim();
+    if(raw === ''){
+      markerNote.textContent = 'Enter a log-odds value (a logistic regression intercept) to drop a line at the matching baseline probability.';
+      markerNote.classList.remove('active');
+      return;
+    }
+    const logOdds = parseFloat(raw);
+    if(isNaN(logOdds)){
+      markerNote.textContent = 'That doesn\u2019t look like a number \u2014 try something like -1.5 or 0.8.';
+      markerNote.classList.remove('active');
+      return;
+    }
+    markerP1 = plogis(logOdds);
+    markerNote.innerHTML = 'log-odds ' + logOdds + ' &rarr; baseline probability <strong>' +
+      (markerP1*100).toFixed(1) + '%</strong>. Marked with a dashed line on the plot.';
+    markerNote.classList.add('active');
+    draw();
+  }
+
+  function clearMarker(){
+    markerP1 = null;
+    logOddsInput.value = '';
+    markerNote.textContent = 'Enter a log-odds value (a logistic regression intercept) to drop a line at the matching baseline probability.';
+    markerNote.classList.remove('active');
+    draw();
+  }
+
+  markBtn.addEventListener('click', setMarker);
+  clearBtn.addEventListener('click', clearMarker);
+  logOddsInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') setMarker();
   });
 })();
 </script>
