@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Odds Ratios &amp; Probability Differences</title>
+<style>
+  :root{
+    --ink:#0b2545;
+    --paper:#fbfaf7;
+    --grid:#e7e4dc;
+    --muted:#6b7280;
+    --dark-curve:#0b2545;
+    --light-curve:#7fbfe0;
+    --accent:#c2410c;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  .wrap{
+    max-width:1080px;
+    margin:0 auto;
+    padding:36px 28px 56px;
+  }
+  h1{
+    font-size:1.7rem;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    margin:0 0 4px;
+  }
+  .sub{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--muted);
+    font-size:0.95rem;
+    max-width:640px;
+    line-height:1.5;
+    margin:0 0 26px;
+  }
+  .stage{
+    position:relative;
+    display:flex;
+    gap:28px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .plot-box{
+    position:relative;
+    background:#fff;
+    border:1px solid var(--grid);
+    border-radius:6px;
+    padding:6px;
+  }
+  canvas{
+    display:block;
+    cursor:crosshair;
+  }
+  .readout{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    min-width:220px;
+    padding-top:8px;
+  }
+  .readout .label{
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:2px;
+  }
+  .readout .value{
+    font-size:2.1rem;
+    font-weight:600;
+    line-height:1.1;
+    margin-bottom:18px;
+    font-family:Georgia,serif;
+  }
+  .readout .value small{
+    font-size:1rem;
+    font-weight:400;
+    color:var(--muted);
+    margin-left:6px;
+  }
+  .readout .row{
+    display:flex;
+    justify-content:space-between;
+    padding:6px 0;
+    border-top:1px solid var(--grid);
+    font-size:0.88rem;
+  }
+  .readout .row span:first-child{color:var(--muted);}
+  .hint{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.82rem;
+    color:var(--muted);
+    margin-top:18px;
+    line-height:1.5;
+  }
+  .swatch{
+    display:inline-block;
+    width:10px;height:10px;
+    border-radius:50%;
+    margin-right:6px;
+    vertical-align:middle;
+  }
+  footer{
+    margin-top:34px;
+    padding-top:14px;
+    border-top:1px solid var(--grid);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:0.78rem;
+    color:var(--muted);
+  }
+  code{
+    background:#f1efe8;
+    padding:1px 5px;
+    border-radius:3px;
+    font-size:0.85em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>How odds ratios translate into probability differences</h1>
+  <p class="sub">
+    Each curve traces one fixed odds ratio (1&ndash;200) across every possible baseline
+    probability. The same odds ratio produces wildly different absolute risk
+    differences depending on how common the outcome already is. Move your mouse
+    over the chart to trace an individual curve.
+  </p>
+
+  <div class="stage">
+    <div class="plot-box">
+      <canvas id="plot" width="760" height="560"></canvas>
+    </div>
+    <div class="readout">
+      <div class="label">Odds ratio</div>
+      <div class="value" id="orValue">&mdash;</div>
+
+      <div class="row"><span>Probability, reference group</span><span id="p1Value">&mdash;</span></div>
+      <div class="row"><span>Probability, comparison group</span><span id="p2Value">&mdash;</span></div>
+      <div class="row"><span>Difference in probability</span><span id="diffValue">&mdash;</span></div>
+
+      <div class="hint">
+        <span class="swatch" style="background:#0b2545"></span>Low odds ratios sit at the bottom of the fan.<br>
+        <span class="swatch" style="background:#7fbfe0"></span>High odds ratios reach the top.<br><br>
+        Hover anywhere on the plot &mdash; the nearest integer odds ratio (1&ndash;200) is
+        highlighted, and its exact probability difference at that point is read
+        out on the y-axis.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Odds<sub>2</sub> = OR &times; Odds<sub>1</sub>, where Odds = p / (1&minus;p).
+    Comparison-group probability is solved back out as p<sub>2</sub> = Odds<sub>2</sub> / (1 + Odds<sub>2</sub>).
+    Curves plot p<sub>2</sub> &minus; p<sub>1</sub> across p<sub>1</sub> &isin; [0, 1] for integer OR from 1 to 200.
+  </footer>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+
+  const cssW = 760, cssH = 560;
+  canvas.width = cssW * DPR;
+  canvas.height = cssH * DPR;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  ctx.scale(DPR, DPR);
+
+  const margin = {left:64, right:20, top:24, bottom:56};
+  const plotW = cssW - margin.left - margin.right;
+  const plotH = cssH - margin.top - margin.bottom;
+
+  function xToPx(p){ return margin.left + p * plotW; }
+  function yToPx(d){ return margin.top + (1 - d/0.9) * plotH; } // y-domain 0..0.9 with headroom
+  const Y_MAX = 0.9;
+  function yToPx2(d){ return margin.top + (1 - d/Y_MAX) * plotH; }
+
+  const MIN_OR = 1, MAX_OR = 200;
+  const N_SAMPLES = 240;
+
+  // color scale: dark navy (low OR) -> light blue (high OR)
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function colorFor(or){
+    const t = (or - MIN_OR) / (MAX_OR - MIN_OR);
+    const c1 = [11,37,69];    // dark navy
+    const c2 = [127,191,224]; // light blue
+    const r = Math.round(lerp(c1[0],c2[0],t));
+    const g = Math.round(lerp(c1[1],c2[1],t));
+    const b = Math.round(lerp(c1[2],c2[2],t));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function diffForOR(or, p1){
+    if(p1 <= 0) return 0;
+    if(p1 >= 1) return 0;
+    const odds1 = p1 / (1 - p1);
+    const odds2 = or * odds1;
+    const p2 = odds2 / (1 + odds2);
+    return p2 - p1;
+  }
+
+  // precompute curves
+  const xs = [];
+  for(let i=0;i<=N_SAMPLES;i++){ xs.push(i/N_SAMPLES); }
+
+  const curves = [];
+  for(let or = MIN_OR; or <= MAX_OR; or++){
+    const ys = xs.map(p1 => diffForOR(or, p1));
+    curves.push({ or, ys });
+  }
+
+  function drawAxes(){
+    ctx.save();
+    ctx.strokeStyle = '#e7e4dc';
+    ctx.lineWidth = 1;
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#6b7280';
+
+    // gridlines + x labels
+    for(let v=0; v<=1.0001; v+=0.25){
+      const px = xToPx(v);
+      ctx.beginPath();
+      ctx.moveTo(px, margin.top);
+      ctx.lineTo(px, margin.top + plotH);
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.fillText(v.toFixed(2), px, margin.top + plotH + 18);
+    }
+    // y gridlines
+    for(let v=0; v<=Y_MAX+0.0001; v+=0.15){
+      const py = yToPx2(v);
+      ctx.beginPath();
+      ctx.moveTo(margin.left, py);
+      ctx.lineTo(margin.left + plotW, py);
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText(v.toFixed(2), margin.left - 10, py + 4);
+    }
+
+    // axis lines
+    ctx.strokeStyle = '#c7c3b8';
+    ctx.beginPath();
+    ctx.moveTo(margin.left, margin.top);
+    ctx.lineTo(margin.left, margin.top + plotH);
+    ctx.lineTo(margin.left + plotW, margin.top + plotH);
+    ctx.stroke();
+
+    // axis titles
+    ctx.fillStyle = '#0b2545';
+    ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Probability in reference group', margin.left + plotW/2, cssH - 14);
+
+    ctx.save();
+    ctx.translate(16, margin.top + plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('Difference in probability in comparison group', 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  let highlightOR = null;
+
+  function draw(){
+    ctx.clearRect(0,0,cssW,cssH);
+    drawAxes();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(margin.left, margin.top, plotW, plotH);
+    ctx.clip();
+
+    // draw non-highlighted curves first, faint
+    for(const c of curves){
+      if(highlightOR !== null && c.or === highlightOR) continue;
+      ctx.beginPath();
+      for(let i=0;i<xs.length;i++){
+        const px = xToPx(xs[i]);
+        const py = yToPx2(c.ys[i]);
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.strokeStyle = highlightOR === null ? colorFor(c.or) : 'rgba(180,180,180,0.35)';
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = highlightOR === null ? 0.55 : 1;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // highlighted curve on top
+    if(highlightOR !== null){
+      const c = curves.find(c => c.or === highlightOR);
+      ctx.beginPath();
+      for(let i=0;i<xs.length;i++){
+        const px = xToPx(xs[i]);
+        const py = yToPx2(c.ys[i]);
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.strokeStyle = colorFor(c.or);
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  draw();
+
+  function updateReadout(or, p1, diff){
+    document.getElementById('orValue').innerHTML = or !== null
+      ? or + '<small>x baseline odds</small>' : '&mdash;';
+    if(or === null){
+      document.getElementById('p1Value').textContent = '\u2014';
+      document.getElementById('p2Value').textContent = '\u2014';
+      document.getElementById('diffValue').textContent = '\u2014';
+      return;
+    }
+    const p2 = p1 + diff;
+    document.getElementById('p1Value').textContent = (p1*100).toFixed(1) + '%';
+    document.getElementById('p2Value').textContent = (p2*100).toFixed(1) + '%';
+    document.getElementById('diffValue').textContent = (diff*100).toFixed(1) + ' pts';
+  }
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    if(mx < margin.left || mx > margin.left + plotW || my < margin.top || my > margin.top + plotH){
+      highlightOR = null;
+      draw();
+      updateReadout(null, 0, 0);
+      return;
+    }
+
+    const p1 = (mx - margin.left) / plotW;
+    // nearest sample index
+    let idx = Math.round(p1 * N_SAMPLES);
+    idx = Math.max(0, Math.min(N_SAMPLES, idx));
+
+    // find curve whose y at this x is closest to mouse y
+    let best = null, bestDist = Infinity;
+    for(const c of curves){
+      const py = yToPx2(c.ys[idx]);
+      const dist = Math.abs(py - my);
+      if(dist < bestDist){ bestDist = dist; best = c; }
+    }
+
+    if(best){
+      highlightOR = best.or;
+      draw();
+      updateReadout(best.or, xs[idx], best.ys[idx]);
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    highlightOR = null;
+    draw();
+    updateReadout(null, 0, 0);
+  });
+})();
+</script>
+</body>
+</html>
