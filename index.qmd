@@ -17,4 +17,4 @@ about:
       href: https://scholar.google.co.uk/citations?user=2yaVvCQAAAAJ&hl=en
 ---
 
-Ben is a Lecturer in Social Statistics and Demography at the [University of Stirling](https://www.stir.ac.uk/people/1752324).
+Ben is a Senior Lecturer in Social Statistics and Demography at the [University of Stirling](https://www.stir.ac.uk/people/1752324).

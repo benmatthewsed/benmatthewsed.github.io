@@ -2,7 +2,7 @@
 title: "Training"
 ---
 
-Put links to some training courses here.
+- [Standardization and Decomposition: An Introduction for Social Scientists (2026)](https://josiahpjking.github.io/sgsss_std_decomp/) With [Josiah King](https://josiahpjking.github.io/)
+-   [Statistical Methods for Criminology (2024)](https://benmatthewsed.github.io/statistical-methods-criminology-slides) In September 2024 I ran an online workshop for [NCRM](https://www.ncrm.ac.uk/) on statistical methods for criminology [you can read the course description from their website here](https://www.ncrm.ac.uk/training/show.php?article=13428).
+-   [Introduction to data visualisation with `ggplot2` (2020)](https://benmatthewsed.github.io/ui-data-visualization-course/#1)
 
--   [Introduction to data visualisation with `ggplot2`](https://benmatthewsed.github.io/ui-data-visualization-course/#1)
--   [Statistical Methods for Criminology](https://benmatthewsed.github.io/statistical-methods-criminology-slides) In September 2024 I ran an online workshop for [NCRM](https://www.ncrm.ac.uk/) on statistical methods for criminology [you can read the course description from their website here](https://www.ncrm.ac.uk/training/show.php?article=13428).
