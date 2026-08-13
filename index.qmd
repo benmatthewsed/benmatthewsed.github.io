@@ -7,8 +7,6 @@ about:
   image-shape: round
   image-width: 20em
   links:
-    - icon: twitter
-      href: https://twitter.com/benmatthewsed
     - icon: github
       href: https://github.com/benmatthewsed
     - icon: envelope
