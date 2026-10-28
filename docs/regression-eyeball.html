@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eyeballing a regression line</title>
+<style>
+  :root{
+    --green-dark: #005734;
+    --green-light: #9fcc69;
+    --orange: #ff994c;
+
+    --bg: #f2f8ea;
+    --bg-deep: #e6f1d8;
+    --panel-solid: #ffffff;
+    --panel-alt: #f7fbf1;
+    --grid-line: #d3e5bb;
+    --grid-line-strong: #9fcc69;
+    --text: #000000;
+    --text-muted: #000000;
+    --text-dim: #1b3a2b;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --radius: 6px;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    min-height:100vh;
+    background: var(--bg);
+    padding: 0 0 60px;
+  }
+
+  .wrap{
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ---------- Header ---------- */
+  .banner{
+    background: var(--green-light);
+    border-bottom: 6px solid var(--green-dark);
+    padding: 28px 20px 24px;
+    margin-bottom: 24px;
+  }
+
+  .banner .wrap{ padding: 0; }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display:inline-block;
+    background: var(--orange);
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin-bottom: 12px;
+  }
+
+  h1{
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: clamp(28px, 4vw, 42px);
+    line-height: 1.1;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+    color: #000;
+  }
+
+  h1 span{
+    background: linear-gradient(transparent 62%, var(--orange) 62%, var(--orange) 92%, transparent 92%);
+  }
+
+  header p{
+    max-width: 640px;
+    color: #000;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  @media (max-width: 880px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background: var(--panel-solid);
+    border: 2px solid var(--green-dark);
+    border-radius: var(--radius);
+    position: relative;
+  }
+
+  /* ---------- Plot panel ---------- */
+  .plot-panel{ padding: 18px 18px 10px; }
+
+  .plot-toprow{
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .plot-label{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .legend{
+    display:flex;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .legend-item{ display:flex; align-items:center; gap:6px; opacity: 0; transition: opacity .35s ease; }
+  .legend-item.show{ opacity: 1; }
+  .swatch{ width: 18px; height: 4px; border-radius: 2px; display:inline-block; }
+  .swatch.orange{ background: var(--orange); }
+  .swatch.green{ background: var(--green-dark); }
+
+  #plotSvg{
+    width: 100%;
+    height: auto;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+
+  #plotSvg.locked{ cursor: default; }
+
+  .status-line{
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text);
+    min-height: 18px;
+    padding: 8px 2px 4px;
+  }
+
+  .status-line.warn{ color: #000; background: var(--orange); border-radius: 3px; padding: 6px 8px; }
+  .status-line.ok{ color: #000; font-weight: 600; }
+
+  /* ---------- Side panel ---------- */
+  .side{
+    display:flex;
+    flex-direction:column;
+    gap: 16px;
+  }
+
+  .side-section{ padding: 16px 18px; }
+
+  .side-title{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 3px solid var(--green-light);
+  }
+
+  .instructions{
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .instructions b{ color: var(--text); font-weight: 700; }
+
+  .btn-row{
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  button{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel-alt);
+    border: 2px solid var(--green-dark);
+    border-radius: var(--radius);
+    padding: 11px 14px;
+    cursor: pointer;
+    transition: background .15s ease, transform .1s ease;
+  }
+
+  button:hover{ background: var(--green-light); }
+  button:active{ transform: translateY(1px); }
+  button:focus-visible{ outline: 3px solid var(--orange); outline-offset: 2px; }
+
+  button.primary{
+    background: var(--green-light);
+  }
+  button.primary:hover{ background: var(--orange); }
+
+  button.ghost{
+    background: #fff;
+  }
+  button.ghost:hover{ background: var(--orange); }
+
+  button:disabled{
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  button:disabled:hover{ background: #fff; }
+
+  /* ---------- Stats ---------- */
+  .stats-section{
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .4s ease, transform .4s ease;
+    pointer-events: none;
+  }
+  .stats-section.show{ opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+  .stat-table{
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .stat-table th{
+    text-align: left;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12px;
+    padding: 0 0 6px;
+  }
+
+  .stat-table th:not(:first-child){ text-align: right; }
+
+  .stat-table td{
+    padding: 7px 0;
+    border-top: 1px solid var(--grid-line);
+    color: var(--text);
+  }
+
+  .stat-table td:first-child{ font-weight: 700; }
+  .row-you td:first-child::before,
+  .row-ols td:first-child::before{
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  .row-you td:first-child::before{ background: var(--orange); }
+  .row-ols td:first-child::before{ background: var(--green-dark); }
+
+  .stat-table td:not(:first-child){ text-align: right; font-variant-numeric: tabular-nums; }
+
+  .gauge-wrap{ margin-top: 16px; }
+
+  .gauge-label{
+    display:flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .gauge-value{ color: var(--text); font-size: 13px; }
+
+  .gauge-track{
+    height: 14px;
+    background: #fff;
+    border: 2px solid var(--green-dark);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .gauge-ticks{
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(90deg, #00000026 0, #00000026 1px, transparent 1px, transparent 10%);
+    pointer-events:none;
+  }
+
+  .gauge-fill{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--orange), var(--green-light) 70%, var(--green-dark));
+    transition: width 1s cubic-bezier(.16,.9,.35,1);
+  }
+
+  .verdict{
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    min-height: 40px;
+  }
+
+  .verdict b{ color: var(--text); }
+
+  footer{
+    max-width: 1180px;
+    margin: 26px auto 0;
+    padding: 0 20px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="banner">
+    <div class="wrap">
+      <header>
+        <div class="eyebrow">ASRP004/104 Workshop Two</div>
+        <h1>Can you eyeball the <span>line of best fit</span> 👀?</h1>
+        <p>Click two points on the scatterplot — or click and drag — to sketch your own regression line. Once it's drawn, the true ordinary‑least‑squares line appears alongside it so you can see how close your guess was.</p>
+      </header>
+    </div>
+  </div>
+
+<div class="wrap">
+
+  <div class="layout">
+
+    <!-- PLOT -->
+    <section class="panel plot-panel">
+      <div class="plot-toprow">
+        <span class="plot-label">Y vs X · n = 100</span>
+        <div class="legend" id="legend">
+          <span class="legend-item" id="legendYou"><span class="swatch orange"></span>Your line</span>
+          <span class="legend-item" id="legendOls"><span class="swatch green"></span>OLS best fit</span>
+        </div>
+      </div>
+      <svg id="plotSvg" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="status-line" id="statusLine">Click a starting point on the plot.</div>
+    </section>
+
+    <!-- SIDE PANEL -->
+    <div class="side">
+
+      <section class="panel side-section">
+        <p class="side-title">How to draw</p>
+        <p class="instructions">
+          <b>Click once</b> to place the start of your line, then <b>click again</b> to set the end —
+          or simply <b>click and drag</b> in one motion. Your line will extend across the full plot.
+        </p>
+      </section>
+
+      <section class="panel side-section">
+        <p class="side-title">Controls</p>
+        <div class="btn-row">
+          <button class="ghost" id="redrawBtn" disabled>Draw again</button>
+          <button class="primary" id="resampleBtn">Resample 100 points</button>
+        </div>
+      </section>
+
+      <section class="panel side-section stats-section" id="statsSection">
+        <p class="side-title">Fit comparison</p>
+        <table class="stat-table">
+          <thead>
+            <tr><th>Line</th><th>Slope</th><th>Intercept</th></tr>
+          </thead>
+          <tbody>
+            <tr class="row-you">
+              <td>You</td><td id="youSlope">–</td><td id="youIntercept">–</td>
+            </tr>
+            <tr class="row-ols">
+              <td>OLS</td><td id="olsSlope">–</td><td id="olsIntercept">–</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="gauge-wrap">
+          <div class="gauge-label">
+            <span>Fit efficiency</span>
+            <span class="gauge-value" id="gaugeValue">0%</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-ticks"></div>
+            <div class="gauge-fill" id="gaugeFill"></div>
+          </div>
+        </div>
+
+        <p class="verdict" id="verdictText"></p>
+      </section>
+
+    </div>
+  </div>
+
+</div>
+
+<footer>SSE = sum of squared residuals · fit efficiency = OLS SSE ÷ your SSE, since OLS minimizes SSE by definition.</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- colours ----------
+  var C_GREEN_DARK = '#005734';
+  var C_GREEN_LIGHT = '#9fcc69';
+  var C_ORANGE = '#ff994c';
+
+  // ---------- geometry / config ----------
+  var VB_W = 900, VB_H = 560;
+  var MARGIN = { left: 62, right: 26, top: 22, bottom: 46 };
+  var PLOT_W = VB_W - MARGIN.left - MARGIN.right;
+  var PLOT_H = VB_H - MARGIN.top - MARGIN.bottom;
+
+  var svg = document.getElementById('plotSvg');
+  var statusLine = document.getElementById('statusLine');
+  var redrawBtn = document.getElementById('redrawBtn');
+  var resampleBtn = document.getElementById('resampleBtn');
+  var statsSection = document.getElementById('statsSection');
+  var legendYou = document.getElementById('legendYou');
+  var legendOls = document.getElementById('legendOls');
+
+  var NS = 'http://www.w3.org/2000/svg';
+
+  function el(tag, attrs){
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs){ e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+
+  // ---------- data model ----------
+  var xMin = 0, xMax = 100;
+  var yMin = 0, yMax = 100; // recomputed per dataset
+  var points = []; // {x,y} data space
+
+  function gaussian(mean, sd){
+    var u = 1 - Math.random();
+    var v = Math.random();
+    var z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    return z * sd + mean;
+  }
+
+  function randRange(a, b){ return a + Math.random() * (b - a); }
+
+  function generateData(){
+    var trueSlope = randRange(0.5, 2.3) * (Math.random() < 0.5 ? -1 : 1);
+    var trueIntercept = randRange(-10, 10);
+    // wider range of noise so each resample varies more in how scattered it looks
+    var noiseSd = randRange(6, 32);
+
+    var pts = [];
+    for (var i = 0; i < 100; i++){
+      var x = randRange(2, 98);
+      var y = trueSlope * x + trueIntercept + gaussian(0, noiseSd);
+      pts.push({ x: x, y: y });
+    }
+    return pts;
+  }
+
+  function niceTicks(min, max, count){
+    var range = max - min;
+    var rough = range / count;
+    var mag = Math.pow(10, Math.floor(Math.log(rough) / Math.LN10));
+    var norm = rough / mag;
+    var step;
+    if (norm < 1.5) step = 1 * mag;
+    else if (norm < 3) step = 2 * mag;
+    else if (norm < 7) step = 5 * mag;
+    else step = 10 * mag;
+
+    var start = Math.ceil(min / step) * step;
+    var ticks = [];
+    for (var v = start; v <= max + 1e-9; v += step){
+      ticks.push(Math.round(v * 1000) / 1000);
+    }
+    return ticks;
+  }
+
+  // ---------- coordinate mapping ----------
+  function xToPx(x){ return MARGIN.left + (x - xMin) / (xMax - xMin) * PLOT_W; }
+  function yToPx(y){ return MARGIN.top + PLOT_H - (y - yMin) / (yMax - yMin) * PLOT_H; }
+  function pxToX(px){ return xMin + (px - MARGIN.left) / PLOT_W * (xMax - xMin); }
+  function pxToY(py){ return yMin + (MARGIN.top + PLOT_H - py) / PLOT_H * (yMax - yMin); }
+
+  // ---------- regression math ----------
+  function ols(pts){
+    var n = pts.length, sx = 0, sy = 0, sxy = 0, sxx = 0;
+    for (var i = 0; i < n; i++){
+      sx += pts[i].x; sy += pts[i].y;
+      sxy += pts[i].x * pts[i].y; sxx += pts[i].x * pts[i].x;
+    }
+    var slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    var intercept = (sy - slope * sx) / n;
+    return { slope: slope, intercept: intercept };
+  }
+
+  function sse(pts, slope, intercept){
+    var s = 0;
+    for (var i = 0; i < pts.length; i++){
+      var resid = pts[i].y - (slope * pts[i].x + intercept);
+      s += resid * resid;
+    }
+    return s;
+  }
+
+  // ---------- drawing state ----------
+  var state = 'drawing'; // 'drawing' | 'done'
+  var clickPoints = []; // svg-space px points
+  var isPointerDown = false;
+  var downPx = null;
+
+  // persistent svg groups
+  var gGrid, gAxes, gPoints, gPreview, gUserLine, gOlsLine;
+
+  function buildStaticSvg(){
+    svg.innerHTML = '';
+
+    var defs = el('defs', {});
+    var pattern = el('pattern', { id: 'graphPaper', width: PLOT_W / 20, height: PLOT_H / 20, patternUnits: 'userSpaceOnUse' });
+    var patLine1 = el('path', { d: 'M ' + (PLOT_W/20) + ' 0 L 0 0 0 ' + (PLOT_H/20), fill: 'none', stroke: '#e6f1d8', 'stroke-width': '1' });
+    pattern.appendChild(patLine1);
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+
+    // panel background
+    svg.appendChild(el('rect', { x: 0, y: 0, width: VB_W, height: VB_H, fill: 'transparent' }));
+
+    // plot background + fine grid
+    svg.appendChild(el('rect', {
+      x: MARGIN.left, y: MARGIN.top, width: PLOT_W, height: PLOT_H,
+      fill: '#fcfef9', stroke: 'none'
+    }));
+    svg.appendChild(el('rect', {
+      x: MARGIN.left, y: MARGIN.top, width: PLOT_W, height: PLOT_H,
+      fill: 'url(#graphPaper)', stroke: C_GREEN_DARK, 'stroke-width': 1.5
+    }));
+
+    gGrid = el('g', { id: 'gGrid' });
+    gAxes = el('g', { id: 'gAxes' });
+    gPoints = el('g', { id: 'gPoints' });
+    gUserLine = el('g', { id: 'gUserLine' });
+    gOlsLine = el('g', { id: 'gOlsLine' });
+    gPreview = el('g', { id: 'gPreview' });
+
+    svg.appendChild(gGrid);
+    svg.appendChild(gAxes);
+    svg.appendChild(gOlsLine);
+    svg.appendChild(gUserLine);
+    svg.appendChild(gPoints);
+    svg.appendChild(gPreview);
+  }
+
+  function drawAxesAndGrid(){
+    gGrid.innerHTML = '';
+    gAxes.innerHTML = '';
+
+    var xTicks = niceTicks(xMin, xMax, 6);
+    var yTicks = niceTicks(yMin, yMax, 6);
+
+    xTicks.forEach(function(t){
+      var px = xToPx(t);
+      gGrid.appendChild(el('line', {
+        x1: px, y1: MARGIN.top, x2: px, y2: MARGIN.top + PLOT_H,
+        stroke: '#cfe3b4', 'stroke-width': 1
+      }));
+      var label = el('text', {
+        x: px, y: MARGIN.top + PLOT_H + 20, 'text-anchor': 'middle',
+        fill: '#000000', 'font-family': 'ui-monospace, monospace', 'font-size': 11
+      });
+      label.textContent = t;
+      gAxes.appendChild(label);
+    });
+
+    yTicks.forEach(function(t){
+      var py = yToPx(t);
+      gGrid.appendChild(el('line', {
+        x1: MARGIN.left, y1: py, x2: MARGIN.left + PLOT_W, y2: py,
+        stroke: '#cfe3b4', 'stroke-width': 1
+      }));
+      var label = el('text', {
+        x: MARGIN.left - 10, y: py + 4, 'text-anchor': 'end',
+        fill: '#000000', 'font-family': 'ui-monospace, monospace', 'font-size': 11
+      });
+      label.textContent = t;
+      gAxes.appendChild(label);
+    });
+
+    // axis lines
+    gAxes.appendChild(el('line', {
+      x1: MARGIN.left, y1: MARGIN.top + PLOT_H, x2: MARGIN.left + PLOT_W, y2: MARGIN.top + PLOT_H,
+      stroke: C_GREEN_DARK, 'stroke-width': 2
+    }));
+    gAxes.appendChild(el('line', {
+      x1: MARGIN.left, y1: MARGIN.top, x2: MARGIN.left, y2: MARGIN.top + PLOT_H,
+      stroke: C_GREEN_DARK, 'stroke-width': 2
+    }));
+
+    var xAxisLabel = el('text', {
+      x: MARGIN.left + PLOT_W / 2, y: VB_H - 6, 'text-anchor': 'middle',
+      fill: '#000000', 'font-family': 'ui-monospace, monospace', 'font-size': 13, 'font-weight': 600
+    });
+    xAxisLabel.textContent = 'X';
+    gAxes.appendChild(xAxisLabel);
+
+    var yAxisLabel = el('text', {
+      x: 16, y: MARGIN.top + PLOT_H / 2, 'text-anchor': 'middle',
+      fill: '#000000', 'font-family': 'ui-monospace, monospace', 'font-size': 13, 'font-weight': 600,
+      transform: 'rotate(-90 16 ' + (MARGIN.top + PLOT_H / 2) + ')'
+    });
+    yAxisLabel.textContent = 'Y';
+    gAxes.appendChild(yAxisLabel);
+  }
+
+  function drawPoints(){
+    gPoints.innerHTML = '';
+    points.forEach(function(p){
+      gPoints.appendChild(el('circle', {
+        cx: xToPx(p.x), cy: yToPx(p.y), r: 4,
+        fill: C_GREEN_LIGHT, 'fill-opacity': 0.95, stroke: C_GREEN_DARK, 'stroke-width': 1.2
+      }));
+    });
+  }
+
+  function lineSegmentAcrossPlot(slope, intercept){
+    // returns px endpoints of the line clipped to the plot rect
+    var y0 = slope * xMin + intercept;
+    var y1 = slope * xMax + intercept;
+    return {
+      x1: xToPx(xMin), y1: yToPx(y0),
+      x2: xToPx(xMax), y2: yToPx(y1)
+    };
+  }
+
+  function drawFullLine(group, slope, intercept, color, dashed){
+    group.innerHTML = '';
+    var seg = lineSegmentAcrossPlot(slope, intercept);
+    var line = el('line', {
+      x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2,
+      stroke: color, 'stroke-width': 3, 'stroke-linecap': 'round'
+    });
+    if (dashed) line.setAttribute('stroke-dasharray', '2 6');
+    group.appendChild(line);
+  }
+
+  // ---------- pointer interaction ----------
+  function svgPointFromEvent(evt){
+    var pt = svg.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    var ctm = svg.getScreenCTM();
+    var loc = pt.matrixTransform(ctm.inverse());
+    var cx = Math.min(Math.max(loc.x, MARGIN.left), MARGIN.left + PLOT_W);
+    var cy = Math.min(Math.max(loc.y, MARGIN.top), MARGIN.top + PLOT_H);
+    return { x: cx, y: cy };
+  }
+
+  function setStatus(msg, tone){
+    statusLine.textContent = msg;
+    statusLine.className = 'status-line' + (tone ? ' ' + tone : '');
+  }
+
+  function resetDrawing(){
+    state = 'drawing';
+    clickPoints = [];
+    isPointerDown = false;
+    downPx = null;
+    gPreview.innerHTML = '';
+    gUserLine.innerHTML = '';
+    gOlsLine.innerHTML = '';
+    svg.classList.remove('locked');
+    statsSection.classList.remove('show');
+    legendYou.classList.remove('show');
+    legendOls.classList.remove('show');
+    redrawBtn.disabled = true;
+    document.getElementById('gaugeFill').style.width = '0%';
+    setStatus('Click a starting point on the plot.');
+  }
+
+  function drawPreviewLine(p1, p2){
+    gPreview.innerHTML = '';
+    gPreview.appendChild(el('line', {
+      x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      stroke: C_ORANGE, 'stroke-width': 2.5, 'stroke-dasharray': '5 5'
+    }));
+    gPreview.appendChild(el('circle', { cx: p1.x, cy: p1.y, r: 5, fill: C_ORANGE, stroke: '#000', 'stroke-width': 1 }));
+
+    var dx = p2.x - p1.x;
+    if (Math.abs(dx) > 6){
+      var label = el('text', {
+        x: p2.x + 10, y: p2.y - 10, fill: '#000000',
+        'font-family': 'ui-monospace, monospace', 'font-size': 12, 'font-weight': 600
+      });
+      // convert to data-space slope for an accurate live reading
+      var d1 = { x: pxToX(p1.x), y: pxToY(p1.y) };
+      var d2 = { x: pxToX(p2.x), y: pxToY(p2.y) };
+      var dataSlope = Math.abs(d2.x - d1.x) > 1e-6 ? (d2.y - d1.y) / (d2.x - d1.x) : null;
+      label.textContent = dataSlope !== null ? ('m \u2248 ' + dataSlope.toFixed(2)) : '';
+      gPreview.appendChild(label);
+    }
+  }
+
+  var DRAG_THRESHOLD = 18;
+
+  function finalizeIfValid(p1, p2){
+    if (Math.abs(p2.x - p1.x) < 20){
+      setStatus('Needs a bit more horizontal spread — try again.', 'warn');
+      return false;
+    }
+    clickPoints = [p1, p2];
+    finalizeLine();
+    return true;
+  }
+
+  function onPointerDown(evt){
+    if (state !== 'drawing') return;
+    evt.preventDefault();
+    var p = svgPointFromEvent(evt);
+
+    if (clickPoints.length === 0){
+      clickPoints.push(p);
+      isPointerDown = true;
+      downPx = p;
+      setStatus('Now click (or release) a second point to set the line.');
+    } else if (clickPoints.length === 1){
+      // second independent click (not part of a drag)
+      finalizeIfValid(clickPoints[0], p);
+    }
+  }
+
+  function onPointerMove(evt){
+    if (state !== 'drawing' || clickPoints.length !== 1) return;
+    var p = svgPointFromEvent(evt);
+    drawPreviewLine(clickPoints[0], p);
+  }
+
+  function onPointerUp(evt){
+    if (state !== 'drawing') return;
+    if (!isPointerDown){ return; }
+    isPointerDown = false;
+    if (clickPoints.length !== 1) return;
+
+    var p = svgPointFromEvent(evt);
+    var dist = Math.hypot(p.x - downPx.x, p.y - downPx.y);
+
+    if (dist > DRAG_THRESHOLD){
+      finalizeIfValid(clickPoints[0], p);
+    }
+    // else: treat as a simple click-placement of point 1; wait for a genuine second click
+  }
+
+  function finalizeLine(){
+    var p1 = clickPoints[0], p2 = clickPoints[1];
+    var d1 = { x: pxToX(p1.x), y: pxToY(p1.y) };
+    var d2 = { x: pxToX(p2.x), y: pxToY(p2.y) };
+
+    var slope = (d2.y - d1.y) / (d2.x - d1.x);
+    var intercept = d1.y - slope * d1.x;
+
+    gPreview.innerHTML = '';
+    drawFullLine(gUserLine, slope, intercept, C_ORANGE, false);
+
+    var olsFit = ols(points);
+    drawFullLine(gOlsLine, olsFit.slope, olsFit.intercept, C_GREEN_DARK, true);
+
+    revealStats(slope, intercept, olsFit);
+
+    state = 'done';
+    svg.classList.add('locked');
+    redrawBtn.disabled = false;
+    setStatus('Line drawn. Compare your fit with the OLS line at right.', 'ok');
+  }
+
+  function revealStats(uSlope, uIntercept, olsFit){
+    document.getElementById('youSlope').textContent = uSlope.toFixed(2);
+    document.getElementById('youIntercept').textContent = uIntercept.toFixed(2);
+    document.getElementById('olsSlope').textContent = olsFit.slope.toFixed(2);
+    document.getElementById('olsIntercept').textContent = olsFit.intercept.toFixed(2);
+
+    var userSse = sse(points, uSlope, uIntercept);
+    var olsSse = sse(points, olsFit.slope, olsFit.intercept);
+    var efficiency = olsSse > 0 ? Math.min(100, (olsSse / userSse) * 100) : 100;
+
+    var gaugeFill = document.getElementById('gaugeFill');
+    var gaugeValue = document.getElementById('gaugeValue');
+    requestAnimationFrame(function(){
+      gaugeFill.style.width = efficiency.toFixed(1) + '%';
+    });
+    gaugeValue.textContent = efficiency.toFixed(1) + '%';
+
+    var verdict;
+    if (efficiency >= 95) verdict = "<b>Excellent.</b> Your line is essentially the best fit — well done!";
+    else if (efficiency >= 80) verdict = "<b>Great fit.</b> Your line tracks very close to the least-squares line.";
+    else if (efficiency >= 60) verdict = "<b>Decent guess.</b> You captured the trend, but the OLS line reduces error further.";
+    else if (efficiency >= 35) verdict = "<b>Rough approximation.</b> The OLS line fits noticeably better than yours. Better luck next time!";
+    else verdict = "<b>Wide of the mark.</b> Your line and the least-squares fit diverge quite a bit — give it another go.";
+
+    document.getElementById('verdictText').innerHTML = verdict;
+
+    statsSection.classList.add('show');
+    legendYou.classList.add('show');
+    legendOls.classList.add('show');
+  }
+
+  // ---------- top-level rebuild ----------
+  function rebuildPlot(){
+    points = generateData();
+    var ys = points.map(function(p){ return p.y; });
+    var rawMin = Math.min.apply(null, ys), rawMax = Math.max.apply(null, ys);
+    var pad = (rawMax - rawMin) * 0.1 || 5;
+    yMin = rawMin - pad;
+    yMax = rawMax + pad;
+
+    buildStaticSvg();
+    drawAxesAndGrid();
+    drawPoints();
+    resetDrawing();
+  }
+
+  // ---------- events ----------
+  svg.addEventListener('pointerdown', onPointerDown);
+  svg.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+
+  redrawBtn.addEventListener('click', function(){
+    buildStaticSvg();
+    drawAxesAndGrid();
+    drawPoints();
+    resetDrawing();
+  });
+
+  resampleBtn.addEventListener('click', rebuildPlot);
+
+  rebuildPlot();
+})();
+</script>
+</body>
+</html>
