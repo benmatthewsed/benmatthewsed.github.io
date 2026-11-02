@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Draw your own line of best fit</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--mut:#656d76;--panel:#ebebeb;--grid:#fff;--pt:#111;--you:#d9480f;--ols:#1c7ed6;--card:#f6f8fa;--bd:#d0d7de;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--panel:#21262d;--grid:#30363d;--pt:#f0f6fc;--you:#ff922b;--ols:#74c0fc;--card:#161b22;--bd:#30363d}}
+:root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--panel:#21262d;--grid:#30363d;--pt:#f0f6fc;--you:#ff922b;--ols:#74c0fc;--card:#161b22;--bd:#30363d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:0 0 4px}
+p{margin:0 0 12px;color:var(--mut)}
+svg{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair;user-select:none}
+.axis{fill:var(--mut);font-size:13px}.lab{fill:var(--fg);font-size:15px}
+.note{fill:var(--mut);font-size:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.card{flex:1 1 240px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.card h2{font-size:1rem;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.sw{width:22px;height:4px;border-radius:2px;display:inline-block}
+.card div{font-variant-numeric:tabular-nums}
+button{margin-top:14px;font:inherit;padding:8px 16px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}button{margin-right:8px}
+#msg{min-height:1.5em;color:var(--fg);margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+<h1>Regression with your eyeballs</h1>
+<p>Click and drag on the plot to draw a straight line through the points. That's it! Not happy? Just drag again to redraw. When you're ready, submit your line to see how close you got to the line made by linear regression.</p>
+<svg id="plot" viewBox="0 0 800 460" role="img" aria-label="Scatterplot of minutes spent studying against assessment score"></svg>
+<div id="msg">Click and drag to draw your line through the points.</div>
+<div class="row" id="results" hidden>
+  <div class="card"><h2><span class="sw" style="background:var(--you)"></span>Your line</h2><div id="u"></div></div>
+  <div class="card"><h2><span class="sw" style="background:var(--ols)"></span>OLS line</h2><div id="o"></div></div>
+</div>
+<div id="verdict" style="margin-top:12px"></div>
+<button id="submit" disabled>Submit my line</button><button id="reset">Clear</button>
+</main>
+<script>
+const D=[[105,52.9],[118,60.5],[136,64.4],[156,79.1],[172,87.9],[174,86.3],[177,89.1],[179,90.6],[180,89.0],[181,93.5]];
+const W=800,H=460,L=60,R=20,T=14,B=64,X0=95,X1=205,Y0=42,Y1=102;
+const sx=x=>L+(x-X0)/(X1-X0)*(W-L-R), sy=y=>H-B-(y-Y0)/(Y1-Y0)*(H-T-B);
+const ix=p=>X0+(p-L)/(W-L-R)*(X1-X0), iy=p=>Y0+(H-B-p)/(H-T-B)*(Y1-Y0);
+const n=D.length,mx=D.reduce((a,d)=>a+d[0],0)/n,my=D.reduce((a,d)=>a+d[1],0)/n;
+const ols=D.reduce((a,d)=>a+(d[0]-mx)*(d[1]-my),0)/D.reduce((a,d)=>a+(d[0]-mx)**2,0);
+const olsI=my-ols*mx;
+const sse=(m,c)=>D.reduce((a,d)=>a+(d[1]-(c+m*d[0]))**2,0);
+const svg=document.getElementById('plot'),NS='http://www.w3.org/2000/svg';
+function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.appendChild(e);return e}
+el('rect',{x:L,y:T,width:W-L-R,height:H-T-B,fill:'var(--panel)'});
+for(let x=100;x<=200;x+=25){el('line',{x1:sx(x),x2:sx(x),y1:T,y2:H-B,stroke:'var(--grid)','stroke-width':1.5});el('text',{x:sx(x),y:H-B+20,'text-anchor':'middle',class:'axis'},x)}
+for(let y=60;y<=100;y+=20){el('line',{y1:sy(y),y2:sy(y),x1:L,x2:W-R,stroke:'var(--grid)','stroke-width':1.5});el('text',{x:L-8,y:sy(y)+4,'text-anchor':'end',class:'axis'},y)}
+el('text',{x:(L+W-R)/2,y:H-24,'text-anchor':'middle',class:'lab'},'Minutes spent studying');
+el('text',{transform:`translate(16 ${(T+H-B)/2}) rotate(-90)`,'text-anchor':'middle',class:'lab'},'Assessment score');
+el('text',{x:W-R,y:H-4,'text-anchor':'end',class:'note'},'These data are fake!');
+const clip=el('clipPath',{id:'c'});const cr=document.createElementNS(NS,'rect');
+[['x',L],['y',T],['width',W-L-R],['height',H-T-B]].forEach(([k,v])=>cr.setAttribute(k,v));clip.appendChild(cr);
+const layer=el('g',{'clip-path':'url(#c)'});
+D.forEach(d=>el('circle',{cx:sx(d[0]),cy:sy(d[1]),r:4.5,fill:'var(--pt)'}));
+const pts=svg.querySelectorAll('circle');pts.forEach(p=>layer.appendChild(p));
+const extLine=el('line',{stroke:'var(--you)','stroke-width':2,'stroke-dasharray':'3 5',opacity:.7,visibility:'hidden'});
+const userLine=el('line',{stroke:'var(--you)','stroke-width':3,'stroke-linecap':'round',visibility:'hidden'});
+const olsLine=el('line',{stroke:'var(--ols)','stroke-width':3,'stroke-dasharray':'8 5',visibility:'hidden'});
+const anchor=el('circle',{r:6,fill:'var(--you)',visibility:'hidden'});
+const anchor2=el('circle',{r:6,fill:'var(--you)',visibility:'hidden'});
+[extLine,olsLine,userLine,anchor,anchor2].forEach(e=>layer.appendChild(e));
+const msg=document.getElementById('msg'),sub=document.getElementById('submit');
+let seg=null,down=null,done=false;
+function pos(e){const r=svg.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
+function params(){if(!seg)return null;const[a,b]=seg,dx=ix(b[0])-ix(a[0]);if(Math.abs(dx)<1e-6)return null;
+  const m=(iy(b[1])-iy(a[1]))/dx;return[m,iy(a[1])-m*ix(a[0])]}
+function full(el,m,c){el.setAttribute('x1',sx(X0));el.setAttribute('x2',sx(X1));el.setAttribute('y1',sy(c+m*X0));el.setAttribute('y2',sy(c+m*X1));el.setAttribute('visibility','visible')}
+function showSeg(){const[a,b]=seg;
+  userLine.setAttribute('x1',a[0]);userLine.setAttribute('y1',a[1]);userLine.setAttribute('x2',b[0]);userLine.setAttribute('y2',b[1]);userLine.setAttribute('visibility','visible');
+  [[anchor,a],[anchor2,b]].forEach(([e,q])=>{e.setAttribute('cx',q[0]);e.setAttribute('cy',q[1]);e.setAttribute('visibility','visible')})}
+svg.addEventListener('pointerdown',e=>{if(done)return;e.preventDefault();svg.setPointerCapture(e.pointerId);down=pos(e)});
+svg.addEventListener('pointermove',e=>{if(done||!down)return;const p=pos(e);
+  if(Math.hypot(p[0]-down[0],p[1]-down[1])>8){seg=[down,p];showSeg();sub.disabled=true;msg.textContent='Release to place your line.'}});
+svg.addEventListener('pointerup',()=>{if(done||!down)return;down=null;
+  if(!seg){return}
+  if(params()){sub.disabled=false;msg.textContent='Happy with it? Submit it, or drag again to redraw.'}
+  else{sub.disabled=true;msg.textContent='That line is vertical. Please try again with some horizontal spread.'}});
+sub.onclick=()=>{const q=params();if(!q)return;const[m,c]=q;done=true;sub.hidden=true;
+  full(extLine,m,c);full(olsLine,ols,olsI);
+  const f=(v,k)=>v.toFixed(k);
+  u.innerHTML=`Slope: <b>${f(m,3)}</b><br>Intercept: <b>${f(c,2)}</b><br>Sum of squared errors: ${f(sse(m,c),1)}`;
+  o.innerHTML=`Slope: <b>${f(ols,3)}</b><br>Intercept: <b>${f(olsI,2)}</b><br>Sum of squared errors: ${f(sse(ols,olsI),1)}`;
+  results.hidden=false;
+  const ds=Math.abs(m-ols)/Math.abs(ols);
+  verdict.innerHTML=`<p style="color:var(--fg)">Your slope is ${f(ds*100,0)}% away from the OLS slope. ${ds<.1?'Excellent: your eye found almost the same line.':ds<.25?'Pretty close. Your eye found roughly the same line.':'Not too far off to be a good start.'} Regression just formalises drawing a line through the points: OLS picks the line that makes the sum of squared vertical distances as small as it can be. (The intercept is the predicted score at 0 minutes, well off the left of this plot. Your dotted line is your segment extended across the plot. A regression line is, in a sense, stupid - it will go all the way to infinity)</p>`;
+  msg.textContent='Dashed blue is the OLS line. Press Clear to try again.'};
+function reset(){done=false;seg=down=null;[extLine,olsLine,userLine,anchor,anchor2].forEach(e=>e.setAttribute('visibility','hidden'));results.hidden=true;verdict.innerHTML='';sub.hidden=false;sub.disabled=true;msg.textContent='Click and drag to draw your line through the points.'}
+document.getElementById('reset').onclick=reset;
+</script>
+</body>
+</html>
